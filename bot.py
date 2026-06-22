@@ -1,25 +1,12 @@
 import os
 import asyncio
-import httpx
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from openai import AsyncOpenAI
-from aiohttp import web
+from aiohttp import web, ClientSession
 
 # Вытаскиваем ключи из настроек Render
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# ЖЕСТКИЙ ФИКС: создаем чистый клиент httpx без поддержки прокси
-# Это на 100% уберет ошибку "unexpected keyword argument 'proxies'"
-custom_http_client = httpx.AsyncClient(proxies=None) if hasattr(httpx, 'AsyncClient') else None
-
-# Подключаем OpenRouter для ИИ
-ai_client = AsyncOpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_KEY,
-    http_client=custom_http_client # Передаем наш чистый клиент
-)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -38,25 +25,38 @@ async def cmd_start(message: types.Message):
 
 @dp.message()
 async def handle_message(message: types.Message):
+    # Показываем статус "печатает...", пока ИИ думает
     await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+    
+    # Напрямую шлем обычный HTTP-запрос к OpenRouter без капризных библиотек
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "deepseek/deepseek-chat:free",
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": message.text}
+        ],
+        "temperature": 0.9
+    }
+    
     try:
-        response = await ai_client.chat.completions.create(
-            model="deepseek/deepseek-chat:free",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": message.text}
-            ],
-            temperature=0.9
-        )
-        ai_text = response.choices[0].message.content
-        await message.reply(ai_text)
+        async with ClientSession() as session:
+            async with session.post(url, headers=headers, json=data) as response:
+                result = await response.json()
+                # Вытаскиваем текст ответа ИИ
+                ai_text = result["choices"][0]["message"]["content"]
+                await message.reply(ai_text)
     except Exception as e:
         print(f"Ошибка ИИ: {e}")
         await message.reply("Блин, мои электронные мозги заклинило от твоего сообщения. Попробуй еще раз, смертный.")
 
-# ХАК ДЛЯ RENDER: поднимаем веб-сервер для портов
+# ХАК ДЛЯ RENDER: веб-сервер для прохождения проверки портов
 async def handle_webhook(request):
-    return web.Response(text="Бот работает!")
+    return web.Response(text="Бот работает успешно!")
 
 async def main():
     print("Бот успешно запущен на сервере Render!")
