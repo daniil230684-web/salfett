@@ -15,7 +15,7 @@ async def cmd_start(message: types.Message):
 
 @dp.message()
 async def handle_message(message: types.Message):
-    # Просто дублируем сообщение, как и раньше
+    # Просто дублируем сообщение обратно
     await message.answer(message.text)
 
 async def main():
