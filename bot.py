@@ -1,5 +1,6 @@
 import os
 import asyncio
+import httpx
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from openai import AsyncOpenAI
@@ -9,10 +10,15 @@ from aiohttp import web
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
 
+# ЖЕСТКИЙ ФИКС: создаем чистый клиент httpx без поддержки прокси
+# Это на 100% уберет ошибку "unexpected keyword argument 'proxies'"
+custom_http_client = httpx.AsyncClient(proxies=None) if hasattr(httpx, 'AsyncClient') else None
+
 # Подключаем OpenRouter для ИИ
 ai_client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=OPENROUTER_KEY,
+    http_client=custom_http_client # Передаем наш чистый клиент
 )
 
 bot = Bot(token=BOT_TOKEN)
@@ -48,21 +54,18 @@ async def handle_message(message: types.Message):
         print(f"Ошибка ИИ: {e}")
         await message.reply("Блин, мои электронные мозги заклинило от твоего сообщения. Попробуй еще раз, смертный.")
 
-# ХАК ДЛЯ RENDER: поднимаем фейковый веб-сервер, чтобы убрать ошибку Port scan timeout
+# ХАК ДЛЯ RENDER: поднимаем веб-сервер для портов
 async def handle_webhook(request):
     return web.Response(text="Бот работает!")
 
 async def main():
     print("Бот успешно запущен на сервере Render!")
     
-    # Запускаем Телеграм-бота в фоновом режиме
     asyncio.create_task(dp.start_polling(bot))
     
-    # Запускаем веб-сервер на порту, который требует Render
     app = web.Application()
     app.router.add_get("/", handle_webhook)
     
-    # Переменную PORT Render подставляет сам автоматически
     port = int(os.getenv("PORT", 80)) 
     
     runner = web.AppRunner(app)
@@ -70,7 +73,6 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     
-    # Держим сервер запущенным бесконечно
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
