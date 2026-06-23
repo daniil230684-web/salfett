@@ -36,8 +36,8 @@ async def handle_message(message: types.Message):
         "HTTP-Referer": BASE_URL, 
         "X-Title": "Neuroham Bot"
     }
-   data = {
-        "model": "meta-llama/llama-3-8b-instruct:free",  # Железобетонная бесплатная модель
+    data = {
+        "model": "meta-llama/llama-3-8b-instruct:free",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message.text}
@@ -75,7 +75,6 @@ async def handle_root(request):
 
 async def on_startup(app):
     webhook_url = f"{BASE_URL}/webhook"
-    # Очищаем старый хвост принудительно перед установкой нового вебхука
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(webhook_url, drop_pending_updates=True)
     print(f"Вебхук успешно привязан к: {webhook_url}")
