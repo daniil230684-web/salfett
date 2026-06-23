@@ -36,8 +36,8 @@ async def handle_message(message: types.Message):
         "HTTP-Referer": BASE_URL, 
         "X-Title": "Neuroham Bot"
     }
-    data = {
-        "model": "google/gemini-2.5-flash",  # Актуальная модель без суффикса :free
+   data = {
+        "model": "meta-llama/llama-3-8b-instruct:free",  # Железобетонная бесплатная модель
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message.text}
