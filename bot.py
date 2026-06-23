@@ -2,9 +2,8 @@ import os
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiohttp import ClientSession
+from aiohttp import web, ClientSession
 
-# Берем ключи из настроек Render
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
 
@@ -58,11 +57,28 @@ async def handle_message(message: types.Message):
         print(f"Критическая ошибка: {e}")
         await message.reply("Блин, мои электронные мозги заклинило от твоего сообщения. Попробуй еще раз, смертный.")
 
+async def handle_webhook(request):
+    return web.Response(text="Порт активен, бот онлайн!")
+
 async def main():
-    print("Бот успешно запущен в режиме прямого опроса (Polling)!")
-    # Перед стартом принудительно удаляем любые вебхуки, если они зависли в ТГ
+    print("Принудительно сбрасываем старые вебхуки в ТГ...")
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    
+    print("Бот запускается в режиме Polling...")
+    asyncio.create_task(dp.start_polling(bot))
+    
+    # Поднимаем мини-сервер исключительно для заглушки Рендера
+    app = web.Application()
+    app.router.add_get("/", handle_webhook)
+    
+    port = int(os.getenv("PORT", 10000)) 
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"Веб-заглушка успешно поднята на порту {port}")
+    
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
