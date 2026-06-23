@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiohttp import web, ClientSession
 
+# Забираем переменные окружения, которые ты настроил в Render
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = "https://salfett.onrender.com"
@@ -11,6 +12,7 @@ BASE_URL = "https://salfett.onrender.com"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# Твой промпт для токсичного Нейрохама
 SYSTEM_PROMPT = (
     "Ты — Нейрохам, toxic, наглый, дерзкий и саркастичный ИИ-ассистент. "
     "Ты постоянно подкалываешь пользователя, используешь современный сленг, мемы "
@@ -24,6 +26,7 @@ async def cmd_start(message: types.Message):
 
 @dp.message()
 async def handle_message(message: types.Message):
+    # Показываем статус "печатает" в Телеге
     try:
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")
     except Exception:
@@ -37,7 +40,7 @@ async def handle_message(message: types.Message):
         "X-Title": "Neuroham Bot"
     }
     data = {
-        "model": "meta-llama/llama-3-8b-instruct:free",
+        "model": "mistralai/mistral-7b-instruct:free",  # Железобетонная бесплатная модель
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message.text}
@@ -61,6 +64,7 @@ async def handle_message(message: types.Message):
         print(f"Ошибка сети: {e}")
         await message.reply("Блин, связь с сервером потеряна.")
 
+# Сюда Телеграм шлет апдейты
 async def handle_telegram_webhook(request):
     try:
         json_data = await request.json()
@@ -70,9 +74,11 @@ async def handle_telegram_webhook(request):
         print(f"Ошибка апдейта: {e}")
     return web.Response(text="OK")
 
+# Заглушка для прохождения проверки портов Render
 async def handle_root(request):
     return web.Response(text="Бот онлайн на Webhook!")
 
+# При старте принудительно сбрасываем старый спам обновлений и вяжем вебхук
 async def on_startup(app):
     webhook_url = f"{BASE_URL}/webhook"
     await bot.delete_webhook(drop_pending_updates=True)
@@ -85,6 +91,7 @@ def main():
     app.router.add_post("/webhook", handle_telegram_webhook)
     app.on_startup.append(on_startup)
     
+    # Render сам передает порт в переменную PORT
     port = int(os.getenv("PORT", 10000))
     web.run_app(app, host="0.0.0.0", port=port)
 
