@@ -43,7 +43,7 @@ async def handle_message(message: types.Message):
         "X-Title": "Neuroham Bot"
     }
     data = {
-        "model": "qwen/qwen-2.5-7b-instruct:free",
+        "model": "qwen/qwen-2.5-7b-instruct",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message.text}
