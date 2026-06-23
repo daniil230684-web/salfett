@@ -23,7 +23,10 @@ async def cmd_start(message: types.Message):
 
 @dp.message()
 async def handle_message(message: types.Message):
-    await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+    try:
+        await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+    except Exception:
+        pass
     
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -33,7 +36,7 @@ async def handle_message(message: types.Message):
         "X-Title": "Neuroham Bot"
     }
     data = {
-        "model": "deepseek/deepseek-chat:free",
+        "model": "google/gemini-2.5-flash:free",  # Поменяли на стабильную модель
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message.text}
@@ -50,12 +53,15 @@ async def handle_message(message: types.Message):
                 if status == 200:
                     ai_text = result["choices"][0]["message"]["content"]
                     await message.reply(ai_text)
+                    return  # Выходим из функции, всё прошло успешно!
                 else:
                     print(f"ОТВЕТ ОТ OPENROUTER (Статус {status}): {result}")
-                    await message.reply("Блин, мои электронные мозги заклинило от твоего сообщения. Попробуй еще раз, смертный.")
+                    await message.reply(f"OpenRouter вернул ошибку {status}. Мозги плавятся!")
+                    return
     except Exception as e:
-        print(f"Критическая ошибка: {e}")
-        await message.reply("Блин, мои электронные мозги заклинило от твоего сообщения. Попробуй еще раз, смертный.")
+        print(f"Критическая ошибка сети: {e}")
+        await message.reply("Блин, связь с сервером потеряна. Попробуй еще раз.")
+        return
 
 async def handle_webhook(request):
     return web.Response(text="Порт активен, бот онлайн!")
@@ -67,7 +73,6 @@ async def main():
     print("Бот запускается в режиме Polling...")
     asyncio.create_task(dp.start_polling(bot))
     
-    # Поднимаем мини-сервер исключительно для заглушки Рендера
     app = web.Application()
     app.router.add_get("/", handle_webhook)
     
