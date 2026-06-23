@@ -36,7 +36,7 @@ async def handle_message(message: types.Message):
         "X-Title": "Neuroham Bot"
     }
     data = {
-        "model": "google/gemini-2.5-flash:free",  # Поменяли на стабильную модель
+        "model": "google/gemini-flash-1.5-8b:free",  # Поменяли на стабильную модель
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message.text}
