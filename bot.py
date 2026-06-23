@@ -6,13 +6,14 @@ from aiohttp import web, ClientSession
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+BASE_URL = "https://salfett.onrender.com"  # Твой URL на Render
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 SYSTEM_PROMPT = (
     "Ты — Нейрохам, toxic, наглый, дерзкий и саркастичный ИИ-ассистент. "
-    "Ты постоянно подкалываешь пользователя, используешь современный сленг, мемы "
+    "Ты постоянно подкалываешь пользователя, использует современный сленг, мемы "
     "и общаешься максимально неформально. На рожон не лезь, жесткие маты не используй, "
     "но отвечай максимально хлестко, угарно и коротко. Обращайся к пользователю на 'ты', 'чел' или 'бро'."
 )
@@ -32,11 +33,11 @@ async def handle_message(message: types.Message):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://render.com", 
+        "HTTP-Referer": BASE_URL, 
         "X-Title": "Neuroham Bot"
     }
     data = {
-        "model": "google/gemini-flash-1.5-8b:free",  # Поменяли на стабильную модель
+        "model": "google/gemini-flash-1.5-8b:free",  # Рабочая бесплатная модель
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message.text}
@@ -53,37 +54,46 @@ async def handle_message(message: types.Message):
                 if status == 200:
                     ai_text = result["choices"][0]["message"]["content"]
                     await message.reply(ai_text)
-                    return  # Выходим из функции, всё прошло успешно!
                 else:
                     print(f"ОТВЕТ ОТ OPENROUTER (Статус {status}): {result}")
                     await message.reply(f"OpenRouter вернул ошибку {status}. Мозги плавятся!")
-                    return
     except Exception as e:
         print(f"Критическая ошибка сети: {e}")
         await message.reply("Блин, связь с сервером потеряна. Попробуй еще раз.")
-        return
 
-async def handle_webhook(request):
-    return web.Response(text="Порт активен, бот онлайн!")
+# Хэндлер, куда Телеграм будет присылать сообщения
+async def handle_telegram_webhook(request):
+    try:
+        json_data = await request.json()
+        update = types.Update(**json_data)
+        await dp.feed_update(bot, update)
+    except Exception as e:
+        print(f"Ошибка при обработке апдейта: {e}")
+    return web.Response(text="OK")
 
-async def main():
-    print("Принудительно сбрасываем старые вебхуки в ТГ...")
-    await bot.delete_webhook(drop_pending_updates=True)
-    
-    print("Бот запускается в режиме Polling...")
-    asyncio.create_task(dp.start_polling(bot))
-    
+async def handle_root(request):
+    return web.Response(text="Бот онлайн на Webhook!")
+
+async def on_startup(app):
+    # Настраиваем Телеграм на отправку сообщений по нашему URL
+    webhook_url = f"{BASE_URL}/webhook"
+    print(f"Устанавливаем вебхук на: {webhook_url}")
+    await bot.set_webhook(webhook_url, drop_pending_updates=True)
+
+async def on_shutdown(app):
+    # Удаляем вебхук при выключении
+    await bot.delete_webhook()
+
+def main():
     app = web.Application()
-    app.router.add_get("/", handle_webhook)
+    app.router.add_get("/", handle_root)
+    app.router.add_post("/webhook", handle_telegram_webhook)
     
-    port = int(os.getenv("PORT", 10000)) 
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    print(f"Веб-заглушка успешно поднята на порту {port}")
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
     
-    await asyncio.Event().wait()
+    port = int(os.getenv("PORT", 10000))
+    web.run_app(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
